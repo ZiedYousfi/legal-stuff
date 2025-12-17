@@ -11,8 +11,8 @@ services:
       - qbittorrent_config:/config
       - downloads:/downloads
     ports:
-      - "8080:8080"   # WebUI
-      - "6881:6881"   # BitTorrent TCP (optionnel mais recommandé)
+      - "8080:8080" # WebUI
+      - "6881:6881" # BitTorrent TCP (optionnel mais recommandé)
       - "6881:6881/udp" # BitTorrent UDP (optionnel)
     restart: unless-stopped
 
@@ -25,6 +25,8 @@ services:
       - TZ=Europe/Paris
     volumes:
       - prowlarr_config:/config
+    ports:
+      - "9696:9696" # WebUI
     restart: unless-stopped
 
   sonarr:
@@ -38,6 +40,8 @@ services:
       - sonarr_config:/config
       - downloads:/downloads
       - tv:/tv
+    ports:
+      - "8989:8989" # WebUI
     restart: unless-stopped
     depends_on:
       - qbittorrent
@@ -54,6 +58,8 @@ services:
       - radarr_config:/config
       - downloads:/downloads
       - movies:/movies
+    ports:
+      - "7878:7878" # WebUI
     restart: unless-stopped
     depends_on:
       - qbittorrent

@@ -8,3 +8,12 @@
     - Qbittorrent:
         href: http://qbittorrent.${DOMAIN}
         description: Torrents
+    - Prowlarr:
+        href: http://prowlarr.${DOMAIN}
+        description: Indexer Manager
+    - Sonarr:
+        href: http://sonarr.${DOMAIN}
+        description: TV Shows
+    - Radarr:
+        href: http://radarr.${DOMAIN}
+        description: Movies
