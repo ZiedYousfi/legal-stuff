@@ -30,6 +30,9 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Paris
+      - ../files/appdata/sonarr:/config
+      - ../files/data/downloads:/downloads
+      - ../files/data/library/tv:/tv
     volumes:
       - ../files/appdata/sonarr:/config
       - ../files/data/downloads:/downloads
@@ -69,3 +72,25 @@ services:
     depends_on:
       - sonarr
       - radarr
+
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    environment:
+      - TZ=Europe/Paris
+    volumes:
+      - ../files/appdata/jellyseerr:/app/config
+    restart: unless-stopped
+    depends_on:
+      - jellyfin
+      - sonarr
+      - radarr
+
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    environment:
+      - TZ=Europe/Paris
+    volumes:
+      - ../files/appdata/homepage:/app/config
+    restart: unless-stopped
