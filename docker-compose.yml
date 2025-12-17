@@ -91,6 +91,7 @@ services:
     container_name: homepage
     environment:
       - TZ=Europe/Paris
+      - HOMEPAGE_ALLOWED_HOSTS=legal.stuff.dokploy.ziedscavern.com,home.ziedscavern.com,localhost
     volumes:
       - ../files/appdata/homepage:/app/config
     restart: unless-stopped
