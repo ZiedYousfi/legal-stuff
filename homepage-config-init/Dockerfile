@@ -13,7 +13,7 @@ RUN apk add --no-cache coreutils
 # The git-tracked Homepage config directory (from this repo) will be copied into the image.
 # We keep it under /seed and then copy into the persistent volume at runtime.
 WORKDIR /seed
-COPY legal-stuff/homepage/ /seed/
+COPY homepage/ /seed/
 
 # Runtime destination is expected to be a mounted volume.
 # - /out will be the `homepage_config` named volume mounted by docker-compose.
@@ -25,7 +25,7 @@ ENV SEED_DIR=/seed \
     OVERWRITE=true
 
 # Copy script (kept in this image; executed as container entrypoint)
-COPY legal-stuff/homepage-config-init/entrypoint.sh /entrypoint.sh
+COPY homepage-config-init/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]

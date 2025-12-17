@@ -86,7 +86,7 @@ services:
   homepage_config_init:
     build:
       context: .
-      dockerfile: legal-stuff/homepage-config-init/Dockerfile
+      dockerfile: homepage-config-init/Dockerfile
     container_name: homepage_config_init
     environment:
       # Git is the source of truth: overwrite the homepage_config volume contents on each deploy/start.
