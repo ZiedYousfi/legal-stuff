@@ -74,7 +74,8 @@ services:
       - TZ=Europe/Paris
     volumes:
       - jellyfin_config:/config
-      - library:/data
+      - tv:/tv:ro
+      - movies:/movies:ro
     restart: unless-stopped
     depends_on:
       - sonarr
