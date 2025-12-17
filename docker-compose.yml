@@ -85,7 +85,7 @@ services:
 
   homepage_config_init:
     build:
-      context: ..
+      context: .
       dockerfile: legal-stuff/homepage-config-init/Dockerfile
     container_name: homepage_config_init
     environment:
