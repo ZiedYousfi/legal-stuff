@@ -107,7 +107,7 @@ services:
       - homepage-config-gen
     environment:
       - TZ=Europe/Paris
-      - HOMEPAGE_ALLOWED_HOSTS=home.${DOMAIN}
+      - HOMEPAGE_ALLOWED_HOSTS=${DOMAIN}
     volumes:
       # Homepage reads config from a volume (managed by Dokploy). No host bind mounts.
       - homepage_config:/app/config
