@@ -96,9 +96,9 @@ DOMAIN=yourdomain.com
 
 This domain will be used to generate all service URLs automatically:
 
-- `https://home.${DOMAIN}` → Homepage dashboard
-- `https://jellyfin.${DOMAIN}` → Jellyfin media player
-- `https://jellyseer.${DOMAIN}` → Jellyseerr requests
+- `https://${DOMAIN}` → Homepage dashboard
+- `http://jellyfin.${DOMAIN}` → Jellyfin media player
+- `http://jellyseer.${DOMAIN}` → Jellyseerr requests
 
 **Default value:** `yourdomain.com` (if not specified)
 
