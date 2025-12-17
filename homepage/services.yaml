@@ -1,4 +1,7 @@
 - Media:
+    - Home:
+        href: /home
+        description: Dashboard
     - Jellyfin:
         href: /jellyfin
         description: Player
