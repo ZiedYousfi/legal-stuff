@@ -8,8 +8,8 @@ services:
       - TZ=Europe/Paris
       - WEBUI_PORT=8080
     volumes:
-      - ../files/appdata/qbittorrent:/config
-      - ../files/data/downloads:/downloads
+      - qbittorrent_config:/config
+      - downloads:/downloads
     restart: unless-stopped
 
   prowlarr:
@@ -20,7 +20,7 @@ services:
       - PGID=1000
       - TZ=Europe/Paris
     volumes:
-      - ../files/appdata/prowlarr:/config
+      - prowlarr_config:/config
     restart: unless-stopped
 
   sonarr:
@@ -30,13 +30,10 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Paris
-      - ../files/appdata/sonarr:/config
-      - ../files/data/downloads:/downloads
-      - ../files/data/library/tv:/tv
     volumes:
-      - ../files/appdata/sonarr:/config
-      - ../files/data/downloads:/downloads
-      - ../files/data/library/tv:/tv
+      - sonarr_config:/config
+      - downloads:/downloads
+      - tv:/tv
     restart: unless-stopped
     depends_on:
       - qbittorrent
@@ -50,9 +47,9 @@ services:
       - PGID=1000
       - TZ=Europe/Paris
     volumes:
-      - ../files/appdata/radarr:/config
-      - ../files/data/downloads:/downloads
-      - ../files/data/library/movies:/movies
+      - radarr_config:/config
+      - downloads:/downloads
+      - movies:/movies
     restart: unless-stopped
     depends_on:
       - qbittorrent
@@ -66,8 +63,8 @@ services:
       - PGID=1000
       - TZ=Europe/Paris
     volumes:
-      - ../files/appdata/jellyfin:/config
-      - ../files/data/library:/data
+      - jellyfin_config:/config
+      - library:/data
     restart: unless-stopped
     depends_on:
       - sonarr
@@ -79,19 +76,50 @@ services:
     environment:
       - TZ=Europe/Paris
     volumes:
-      - ../files/appdata/jellyseerr:/app/config
+      - jellyseerr_config:/app/config
     restart: unless-stopped
     depends_on:
       - jellyfin
       - sonarr
       - radarr
 
+  homepage_config_init:
+    build:
+      context: ..
+      dockerfile: legal-stuff/homepage-config-init/Dockerfile
+    container_name: homepage_config_init
+    environment:
+      # Git is the source of truth: overwrite the homepage_config volume contents on each deploy/start.
+      - OVERWRITE=true
+    volumes:
+      - homepage_config:/out
+    restart: "no"
+
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
+    depends_on:
+      - homepage_config_init
     environment:
       - TZ=Europe/Paris
       - HOMEPAGE_ALLOWED_HOSTS=legal.stuff.dokploy.ziedscavern.com,home.ziedscavern.com,localhost
     volumes:
-      - ./homepage:/app/config:ro
+      # Homepage reads config from a volume (managed by Dokploy). No host bind mounts.
+      - homepage_config:/app/config
+      # Ensure logs are persisted and writable so the app can create /app/config/logs without ENOENT.
+      - homepage_logs:/app/config/logs
     restart: unless-stopped
+
+volumes:
+  qbittorrent_config:
+  prowlarr_config:
+  sonarr_config:
+  radarr_config:
+  jellyfin_config:
+  jellyseerr_config:
+  homepage_config:
+  homepage_logs:
+  downloads:
+  library:
+  tv:
+  movies:
