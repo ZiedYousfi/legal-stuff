@@ -93,5 +93,5 @@ services:
       - TZ=Europe/Paris
       - HOMEPAGE_ALLOWED_HOSTS=legal.stuff.dokploy.ziedscavern.com,home.ziedscavern.com,localhost
     volumes:
-      - ../files/appdata/homepage:/app/config
+      - ./homepage:/app/config:ro
     restart: unless-stopped

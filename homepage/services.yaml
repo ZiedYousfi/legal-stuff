@@ -1,0 +1,7 @@
+- Media:
+    - Jellyfin:
+        href: /jellyfin
+        description: Player
+    - Jellyseerr:
+        href: /requests
+        description: Requests
