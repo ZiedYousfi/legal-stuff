@@ -1,7 +1,7 @@
 - Media:
     - Jellyfin:
-        href: https://jellyfin.${DOMAIN}
+        href: http://jellyfin.${DOMAIN}
         description: Player
     - Jellyseerr:
-        href: https://jellyseer.${DOMAIN}
+        href: http://jellyseer.${DOMAIN}
         description: Requests
