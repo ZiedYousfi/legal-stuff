@@ -5,3 +5,6 @@
     - Jellyseerr:
         href: http://jellyseer.${DOMAIN}
         description: Requests
+    - Qbittorrent:
+        href: http://qbittorrent.${DOMAIN}
+        description: Torrents

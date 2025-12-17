@@ -10,6 +10,10 @@ services:
     volumes:
       - qbittorrent_config:/config
       - downloads:/downloads
+    ports:
+      - "8080:8080"   # WebUI
+      - "6881:6881"   # BitTorrent TCP (optionnel mais recommandé)
+      - "6881:6881/udp" # BitTorrent UDP (optionnel)
     restart: unless-stopped
 
   prowlarr:
@@ -107,7 +111,7 @@ services:
       - homepage-config-gen
     environment:
       - TZ=Europe/Paris
-      - HOMEPAGE_ALLOWED_HOSTS=${DOMAIN}
+      - HOMEPAGE_ALLOWED_HOSTS=home.${DOMAIN}
     volumes:
       # Homepage reads config from a volume (managed by Dokploy). No host bind mounts.
       - homepage_config:/app/config
