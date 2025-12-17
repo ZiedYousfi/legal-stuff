@@ -83,26 +83,31 @@ services:
       - sonarr
       - radarr
 
-  homepage_config_init:
-    build:
-      context: .
-      dockerfile: homepage-config-init/Dockerfile
-    container_name: homepage_config_init
+  homepage-config-gen:
+    image: alpine:3.20
+    container_name: homepage-config-gen
     environment:
-      # Git is the source of truth: overwrite the homepage_config volume contents on each deploy/start.
-      - OVERWRITE=true
+      - DOMAIN=${DOMAIN}
     volumes:
+      - ./homepage:/source:ro
       - homepage_config:/out
+    command: |
+      sh -c '
+        sed "s|\$${DOMAIN}|$$DOMAIN|g" /source/services.yaml > /out/services.yaml &&
+        cp /source/settings.yaml /out/settings.yaml &&
+        cp /source/bookmarks.yaml /out/bookmarks.yaml &&
+        cp /source/widgets.yaml /out/widgets.yaml
+      '
     restart: "no"
 
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
     depends_on:
-      - homepage_config_init
+      - homepage-config-gen
     environment:
       - TZ=Europe/Paris
-      - HOMEPAGE_ALLOWED_HOSTS=legal.stuff.dokploy.ziedscavern.com,home.ziedscavern.com,localhost
+      - HOMEPAGE_ALLOWED_HOSTS=home.${DOMAIN}
     volumes:
       # Homepage reads config from a volume (managed by Dokploy). No host bind mounts.
       - homepage_config:/app/config

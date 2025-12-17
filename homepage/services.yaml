@@ -1,10 +1,7 @@
 - Media:
-    - Home:
-        href: /home
-        description: Dashboard
     - Jellyfin:
-        href: /jellyfin
+        href: https://jellyfin.${DOMAIN}
         description: Player
     - Jellyseerr:
-        href: /requests
+        href: https://jellyseer.${DOMAIN}
         description: Requests

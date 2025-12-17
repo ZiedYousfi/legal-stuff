@@ -1,12 +1,12 @@
 # legal-stuff (Dokploy-only)
 
-This repository is **Dokploy-first**: you deploy it by pointing Dokploy to this repo’s `docker-compose.yml`.
+This repository is **Dokploy-first**: you deploy it by pointing Dokploy to this repo's `docker-compose.yml`.
 
 - **No host machine steps** are required or assumed for this stack.
 - **No host paths / bind mounts** are used by this stack.
 - All persistence is handled via **Docker named volumes** managed by Dokploy/Docker.
 
-If you’re looking for “ssh to the server and create folders”, that is intentionally **not** part of this setup.
+If you're looking for "ssh to the server and create folders", that is intentionally **not** part of this setup.
 
 ---
 
@@ -14,7 +14,7 @@ If you’re looking for “ssh to the server and create folders”, that is inte
 
 - `legal-stuff/docker-compose.yml`: the complete Compose stack
 - `legal-stuff/homepage/`: Homepage YAML config files (source of truth in git)
-- `legal-stuff/homepage-config-init/`: an init container image that syncs Homepage config from git into the persistent `homepage_config` volume at deploy/start time
+- `legal-stuff/homepage-config-gen`: an Alpine-based service that generates Homepage config with dynamic domain substitution
 
 ---
 
@@ -63,24 +63,46 @@ In Dokploy:
 
 - `legal-stuff/docker-compose.yml`
 
-4. Deploy.
+4. **Configure the `DOMAIN` environment variable** in Dokploy's environment settings:
 
-That’s it. No host preparation.
+```
+DOMAIN=yourdomain.com
+```
+5. Deploy.
+
+That's it. No host preparation.
 
 ### 2) Configure domains / routing (Dokploy)
 
 How you expose services depends on your Dokploy reverse proxy setup.
 
-At minimum you typically want:
 
-- `homepage` exposed (HTTP)
-- optionally `jellyfin` and `jellyseerr`
 
 This repo does not hardcode labels because Dokploy setups vary. Prefer configuring routing in Dokploy (or add labels once you confirm your proxy approach).
 
 ---
 
-## Environment variables / IDs (PUID/PGID)
+## Environment variables
+
+### Required: DOMAIN
+
+The `DOMAIN` environment variable is **required** and must be set in Dokploy's environment configuration.
+
+Example:
+
+```
+DOMAIN=yourdomain.com
+```
+
+This domain will be used to generate all service URLs automatically:
+
+- `https://home.${DOMAIN}` → Homepage dashboard
+- `https://jellyfin.${DOMAIN}` → Jellyfin media player
+- `https://jellyseer.${DOMAIN}` → Jellyseerr requests
+
+**Default value:** `yourdomain.com` (if not specified)
+
+### Optional: PUID/PGID
 
 LinuxServer images commonly use `PUID`/`PGID`. This repo sets them to `1000/1000`.
 
@@ -89,33 +111,41 @@ In Dokploy you generally do one of the following:
 - keep defaults, or
 - override `PUID`/`PGID` in Dokploy environment configuration if needed.
 
-Because volumes are managed by Docker/Dokploy, you typically won’t need to manually fix permissions on the host.
+Because volumes are managed by Docker/Dokploy, you typically won't need to manually fix permissions on the host.
 
 ---
 
 ## Homepage config management (important)
 
-### Git is the source of truth (automated sync)
+### Git is the source of truth (automated dynamic generation)
 
-This repo is configured so that Homepage config is sourced from git **automatically at deploy/start time**, without host bind mounts:
+This repo is configured so that Homepage config is sourced from git **automatically at deploy/start time**, with dynamic domain substitution:
 
-- `legal-stuff/homepage/*.yaml` is stored in git
-- an init container (`homepage_config_init`) runs first and copies the git config into the persistent `homepage_config` named volume
+- `legal-stuff/homepage/*.yaml` is stored in git with `${DOMAIN}` placeholders
+- the `homepage-config-gen` service runs first and:
+  - replaces all `${DOMAIN}` occurrences with the actual domain value
+  - copies the processed config into the persistent `homepage_config` named volume
 - then `homepage` starts and reads config from `/app/config` (the volume)
 
 This gives you:
 
 - reproducible config from git on every deploy
+- dynamic domain configuration (change `DOMAIN` env var to deploy on different domains)
 - persistent volumes for logs and media (no re-downloads)
 
-### Overwrite behavior
+### How it works
 
-By default this repo uses overwrite mode, meaning **git wins on every deploy/start**:
+The `homepage-config-gen` service uses Alpine Linux with `sed` to replace variables:
 
-- the init container syncs `legal-stuff/homepage/` into the `homepage_config` volume
-- existing files in the volume are overwritten
+1. Reads `homepage/services.yaml` from the git repo
+2. Replaces all `${DOMAIN}` with the actual domain (e.g., `yourdomain.com`)
+3. Writes the processed config to the `homepage_config` volume
+4. Copies other config files as-is
 
-If you ever want to keep manual edits inside the volume, change the init container environment to seed-only mode (no overwrites) by setting `OVERWRITE=false` for `homepage_config_init` in `docker-compose.yml`.
+**Example:** If `DOMAIN=yourdomain.com`, then:
+
+- `https://jellyfin.${DOMAIN}` → `https://jellyfin.yourdomain.com`
+- `https://jellyseer.${DOMAIN}` → `https://jellyseer.yourdomain.com`
 
 ---
 
