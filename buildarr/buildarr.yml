@@ -70,7 +70,7 @@ sonarr:
 
     root_folders:
       definitions:
-        - /arr_tv
+        - /data/media/tv
 
 # ══════════════════════════════════════════════════════════════════════════════
 # RADARR (Utilise "hostname" pour le download client)
@@ -97,4 +97,4 @@ radarr:
 
     root_folders:
       definitions:
-        - /arr_movies
+        - /data/media/movies

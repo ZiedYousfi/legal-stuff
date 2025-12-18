@@ -9,7 +9,7 @@ services:
       - WEBUI_PORT=8080
     volumes:
       - qbittorrent_config:/config
-      - downloads:/arr_downloads
+      - data:/data
     ports:
       - "8080:8080" # WebUI
       - "6881:6881" # BitTorrent TCP
@@ -55,8 +55,7 @@ services:
       - SONARR_API_KEY=${SONARR_API_KEY}
     volumes:
       - sonarr_config:/config
-      - downloads:/arr_downloads
-      - tv:/arr_tv
+      - data:/data
     ports:
       - "8989:8989" # WebUI
     restart: unless-stopped
@@ -87,8 +86,7 @@ services:
       - RADARR_API_KEY=${RADARR_API_KEY}
     volumes:
       - radarr_config:/config
-      - downloads:/arr_downloads
-      - movies:/arr_movies
+      - data:/data
     ports:
       - "7878:7878" # WebUI
     restart: unless-stopped
@@ -118,8 +116,7 @@ services:
       - TZ=Europe/Paris
     volumes:
       - jellyfin_config:/config
-      - tv:/arr_tv:ro
-      - movies:/arr_movies:ro
+      - data:/data:ro
     ports:
       - "8096:8096" # WebUI (HTTP)
     restart: unless-stopped
@@ -189,15 +186,12 @@ services:
       - qbittorrent_config:/out_qbit
       - jellyfin_config:/out_jellyfin
       - jellyseerr_config:/out_jellyseerr
-      - downloads:/out_downloads
-      - tv:/out_tv
-      - movies:/out_movies
-      - library:/out_library
+      - data:/out_data
       - ./scripts:/scripts:ro
     command: |
       sh -c "
       apk add --no-cache gettext xmlstarlet curl jq &&
-      mkdir -p /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr /out_qbit /out_jellyfin /out_jellyseerr /out_downloads /out_downloads/temp /out_tv /out_movies /out_library &&
+      mkdir -p /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr /out_qbit /out_jellyfin /out_jellyseerr /out_data/downloads /out_data/downloads/temp /out_data/media/tv /out_data/media/movies &&
       envsubst < /source_homepage/services.yaml > /out_homepage/services.yaml &&
       cp /source_homepage/settings.yaml /out_homepage/settings.yaml &&
       mkdir -p /out_buildarr &&
@@ -268,17 +262,17 @@ services:
       WebUI\\\\LocalHostAuth=false
       WebUI\\\\AuthSubnetWhitelistEnabled=true
       WebUI\\\\AuthSubnetWhitelist=172.16.0.0/12, 192.168.0.0/16, 10.0.0.0/8, 127.0.0.1/32
-      WebUI\\\\HostHeaderValidation=false
-      WebUI\\\\CSRFProtection=false
-      Downloads\\\\SavePath=/arr_downloads/
-      Downloads\\\\TempPath=/arr_downloads/temp/
-      Downloads\\\\TempPathEnabled=true
-      Session\\\\DefaultSavePath=/arr_downloads/
-      Session\\\\SavePath=/arr_downloads/
+      WebUI\\HostHeaderValidation=false
+      WebUI\\CSRFProtection=false
+      Downloads\\SavePath=/data/downloads/
+      Downloads\\TempPath=/data/downloads/temp/
+      Downloads\\TempPathEnabled=true
+      Session\\DefaultSavePath=/data/downloads/
+      Session\\SavePath=/data/downloads/
       EOF
-            chown -R 1000:1000 /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr /out_qbit /out_jellyfin /out_jellyseerr /out_downloads /out_tv /out_movies /out_library &&
-            find /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr /out_qbit /out_jellyfin /out_jellyseerr /out_downloads /out_tv /out_movies /out_library -type d -exec chmod 755 {} + &&
-            find /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr /out_qbit /out_jellyfin /out_jellyseerr /out_downloads /out_tv /out_movies /out_library -type f -exec chmod 644 {} +
+            chown -R 1000:1000 /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr /out_qbit /out_jellyfin /out_jellyseerr /out_data &&
+            find /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr /out_qbit /out_jellyfin /out_jellyseerr /out_data -type d -exec chmod 755 {} + &&
+            find /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr /out_qbit /out_jellyfin /out_jellyseerr /out_data -type f -exec chmod 644 {} +
       "
     restart: "no"
 
@@ -354,10 +348,7 @@ volumes:
   homepage_config:
   homepage_logs:
   buildarr_config:
-  downloads:
-  library:
-  tv:
-  movies:
+  data:
 
 networks:
   default:
