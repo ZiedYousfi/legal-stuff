@@ -9,11 +9,11 @@ services:
       - WEBUI_PORT=8080
     volumes:
       - qbittorrent_config:/config
-      - downloads:/downloads
+      - downloads:/arr_downloads
     ports:
       - "8080:8080" # WebUI
-      - "6881:6881" # BitTorrent TCP (optionnel mais recommandé)
-      - "6881:6881/udp" # BitTorrent UDP (optionnel)
+      - "6881:6881" # BitTorrent TCP
+      - "6881:6881/udp" # BitTorrent UDP
     restart: unless-stopped
 
   prowlarr:
@@ -23,11 +23,24 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Paris
+      - PROWLARR_API_KEY=${PROWLARR_API_KEY}
     volumes:
       - prowlarr_config:/config
     ports:
       - "9696:9696" # WebUI
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:9696/api/v1/system/status?apiKey=${PROWLARR_API_KEY} > /dev/null || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      config-init:
+        condition: service_completed_successfully
 
   sonarr:
     image: lscr.io/linuxserver/sonarr:latest
@@ -36,16 +49,30 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Paris
+      - SONARR_API_KEY=${SONARR_API_KEY}
     volumes:
       - sonarr_config:/config
-      - downloads:/downloads
-      - tv:/tv
+      - downloads:/arr_downloads
+      - tv:/arr_tv
     ports:
       - "8989:8989" # WebUI
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8989/api/v3/system/status?apiKey=${SONARR_API_KEY} > /dev/null || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
-      - qbittorrent
-      - prowlarr
+      config-init:
+        condition: service_completed_successfully
+      qbittorrent:
+        condition: service_started
+      prowlarr:
+        condition: service_healthy
 
   radarr:
     image: lscr.io/linuxserver/radarr:latest
@@ -54,16 +81,30 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Paris
+      - RADARR_API_KEY=${RADARR_API_KEY}
     volumes:
       - radarr_config:/config
-      - downloads:/downloads
-      - movies:/movies
+      - downloads:/arr_downloads
+      - movies:/arr_movies
     ports:
       - "7878:7878" # WebUI
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:7878/api/v3/system/status?apiKey=${RADARR_API_KEY} > /dev/null || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
-      - qbittorrent
-      - prowlarr
+      config-init:
+        condition: service_completed_successfully
+      qbittorrent:
+        condition: service_started
+      prowlarr:
+        condition: service_healthy
 
   jellyfin:
     image: lscr.io/linuxserver/jellyfin:latest
@@ -74,8 +115,10 @@ services:
       - TZ=Europe/Paris
     volumes:
       - jellyfin_config:/config
-      - tv:/tv:ro
-      - movies:/movies:ro
+      - tv:/arr_tv:ro
+      - movies:/arr_movies:ro
+    ports:
+      - "8096:8096" # WebUI (HTTP)
     restart: unless-stopped
     depends_on:
       - sonarr
@@ -88,42 +131,185 @@ services:
       - TZ=Europe/Paris
     volumes:
       - jellyseerr_config:/app/config
+    ports:
+      - "5055:5055" # WebUI
     restart: unless-stopped
     depends_on:
       - jellyfin
       - sonarr
       - radarr
 
-  homepage-config-gen:
+  buildarr:
+    image: callum027/buildarr:latest
+    container_name: buildarr
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Paris
+      - BUILDARR_INSTALL_PACKAGES=buildarr-sonarr buildarr-radarr buildarr-prowlarr
+    volumes:
+      - buildarr_config:/config
+    depends_on:
+      config-init:
+        condition: service_completed_successfully
+      sonarr:
+        condition: service_healthy
+      radarr:
+        condition: service_healthy
+      prowlarr:
+        condition: service_healthy
+      qbittorrent:
+        condition: service_started
+      radarr-naming-init:
+        condition: service_completed_successfully
+
+  config-init:
     image: alpine:3.20
-    container_name: homepage-config-gen
+    container_name: config-init
     environment:
       - DOMAIN=${DOMAIN}
+      - SONARR_API_KEY=${SONARR_API_KEY}
+      - RADARR_API_KEY=${RADARR_API_KEY}
+      - PROWLARR_API_KEY=${PROWLARR_API_KEY}
+      - QBIT_USER=${QBIT_USER}
+      - QBIT_PASS=${QBIT_PASS}
     volumes:
-      - ./homepage:/source:ro
-      - homepage_config:/out
+      - ./homepage:/source_homepage:ro
+      - ./buildarr:/source_buildarr:ro
+      - homepage_config:/out_homepage
+      - homepage_logs:/out_homepage_logs
+      - buildarr_config:/out_buildarr
+      - prowlarr_config:/out_prowlarr
+      - sonarr_config:/out_sonarr
+      - radarr_config:/out_radarr
+      - ./scripts:/scripts:ro
     command: |
-      sh -c '
-        sed "s|\$${DOMAIN}|$$DOMAIN|g" /source/services.yaml > /out/services.yaml &&
-        cp /source/settings.yaml /out/settings.yaml &&
-        cp /source/bookmarks.yaml /out/bookmarks.yaml &&
-        cp /source/widgets.yaml /out/widgets.yaml
-      '
+      sh -c "
+      apk add --no-cache gettext xmlstarlet curl jq &&
+      mkdir -p /out_homepage &&
+      envsubst < /source_homepage/services.yaml > /out_homepage/services.yaml &&
+      cp /source_homepage/settings.yaml /out_homepage/settings.yaml &&
+      mkdir -p /out_buildarr &&
+      envsubst < /source_buildarr/buildarr.yml > /out_buildarr/buildarr.yml &&
+      mkdir -p /out_prowlarr &&
+      if [ -f /out_prowlarr/config.xml ]; then
+        xmlstarlet ed -L -u '/Config/ApiKey' -v "$PROWLARR_API_KEY" -u '/Config/AuthenticationMethod' -v "External" /out_prowlarr/config.xml;
+      else
+        cat > /out_prowlarr/config.xml <<EOF
+      <?xml version=\"1.0\" encoding=\"utf-8\"?>
+      <Config>
+        <ApiKey>$PROWLARR_API_KEY</ApiKey>
+        <AuthenticationMethod>External</AuthenticationMethod>
+        <AuthenticationRequired>DisabledForLocalAddresses</AuthenticationRequired>
+        <BindAddress>*</BindAddress>
+        <Port>9696</Port>
+        <UrlBase></UrlBase>
+        <InstanceName>Prowlarr</InstanceName>
+        <LogLevel>info</LogLevel>
+        <AnalyticsEnabled>False</AnalyticsEnabled>
+      </Config>
+      EOF
+      fi &&
+      mkdir -p /out_sonarr &&
+      if [ -f /out_sonarr/config.xml ]; then
+        xmlstarlet ed -L -u '/Config/ApiKey' -v "$SONARR_API_KEY" /out_sonarr/config.xml;
+      else
+        cat > /out_sonarr/config.xml <<EOF
+      <?xml version=\"1.0\" encoding=\"utf-8\"?>
+      <Config>
+        <ApiKey>$SONARR_API_KEY</ApiKey>
+        <AuthenticationMethod>None</AuthenticationMethod>
+        <AuthenticationRequired>DisabledForLocalAddresses</AuthenticationRequired>
+        <BindAddress>*</BindAddress>
+        <Port>8989</Port>
+        <UrlBase></UrlBase>
+        <InstanceName>Sonarr</InstanceName>
+        <LogLevel>info</LogLevel>
+        <AnalyticsEnabled>False</AnalyticsEnabled>
+      </Config>
+      EOF
+      fi &&
+      mkdir -p /out_radarr &&
+      if [ -f /out_radarr/config.xml ]; then
+        xmlstarlet ed -L -u '/Config/ApiKey' -v "$RADARR_API_KEY" /out_radarr/config.xml;
+      else
+        cat > /out_radarr/config.xml <<EOF
+      <?xml version=\"1.0\" encoding=\"utf-8\"?>
+      <Config>
+        <ApiKey>$RADARR_API_KEY</ApiKey>
+        <AuthenticationMethod>None</AuthenticationMethod>
+        <AuthenticationRequired>DisabledForLocalAddresses</AuthenticationRequired>
+        <BindAddress>*</BindAddress>
+        <Port>7878</Port>
+        <UrlBase></UrlBase>
+        <InstanceName>Radarr</InstanceName>
+        <LogLevel>info</LogLevel>
+        <AnalyticsEnabled>False</AnalyticsEnabled>
+      </Config>
+      EOF
+      fi &&
+      chown -R 1000:1000 /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr &&
+      find /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr -type d -exec chmod 755 {} + &&
+      find /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr -type f -exec chmod 644 {} +
+      "
     restart: "no"
+
+  download-client-init:
+    image: alpine:3.20
+    container_name: download-client-init
+    environment:
+      - SONARR_API_KEY=${SONARR_API_KEY}
+      - RADARR_API_KEY=${RADARR_API_KEY}
+      - PROWLARR_API_KEY=${PROWLARR_API_KEY}
+      - QBIT_USER=${QBIT_USER}
+      - QBIT_PASS=${QBIT_PASS}
+    volumes:
+      - ./scripts:/scripts:ro
+    command: ["sh", "/scripts/init-download-clients.sh"]
+    restart: "no"
+    depends_on:
+      sonarr:
+        condition: service_healthy
+      radarr:
+        condition: service_healthy
+      prowlarr:
+        condition: service_healthy
+      qbittorrent:
+        condition: service_started
+
+  radarr-naming-init:
+    image: alpine:3.20
+    container_name: radarr-naming-init
+    environment:
+      - RADARR_API_KEY=${RADARR_API_KEY}
+    volumes:
+      - ./scripts:/scripts:ro
+    entrypoint:
+      [
+        "sh",
+        "-c",
+        "apk add --no-cache curl jq && sh /scripts/init-radarr-naming.sh",
+      ]
+    restart: "no"
+    depends_on:
+      radarr:
+        condition: service_healthy
 
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
     depends_on:
-      - homepage-config-gen
+      config-init:
+        condition: service_completed_successfully
     environment:
       - TZ=Europe/Paris
       - HOMEPAGE_ALLOWED_HOSTS=home.${DOMAIN}
     volumes:
-      # Homepage reads config from a volume (managed by Dokploy). No host bind mounts.
       - homepage_config:/app/config
-      # Ensure logs are persisted and writable so the app can create /app/config/logs without ENOENT.
       - homepage_logs:/app/config/logs
+    ports:
+      - "3000:3000" # WebUI - mapped for local access
     restart: unless-stopped
 
 volumes:
@@ -135,7 +321,12 @@ volumes:
   jellyseerr_config:
   homepage_config:
   homepage_logs:
+  buildarr_config:
   downloads:
   library:
   tv:
   movies:
+
+networks:
+  default:
+    name: media-stack
