@@ -15,6 +15,9 @@ services:
       - "6881:6881" # BitTorrent TCP
       - "6881:6881/udp" # BitTorrent UDP
     restart: unless-stopped
+    depends_on:
+      config-init:
+        condition: service_completed_successfully
 
   prowlarr:
     image: lscr.io/linuxserver/prowlarr:latest
@@ -183,11 +186,18 @@ services:
       - prowlarr_config:/out_prowlarr
       - sonarr_config:/out_sonarr
       - radarr_config:/out_radarr
+      - qbittorrent_config:/out_qbit
+      - jellyfin_config:/out_jellyfin
+      - jellyseerr_config:/out_jellyseerr
+      - downloads:/out_downloads
+      - tv:/out_tv
+      - movies:/out_movies
+      - library:/out_library
       - ./scripts:/scripts:ro
     command: |
       sh -c "
       apk add --no-cache gettext xmlstarlet curl jq &&
-      mkdir -p /out_homepage &&
+      mkdir -p /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr /out_qbit /out_jellyfin /out_jellyseerr /out_downloads /out_downloads/temp /out_tv /out_movies /out_library &&
       envsubst < /source_homepage/services.yaml > /out_homepage/services.yaml &&
       cp /source_homepage/settings.yaml /out_homepage/settings.yaml &&
       mkdir -p /out_buildarr &&
@@ -210,12 +220,12 @@ services:
         <AnalyticsEnabled>False</AnalyticsEnabled>
       </Config>
       EOF
-      fi &&
-      mkdir -p /out_sonarr &&
-      if [ -f /out_sonarr/config.xml ]; then
-        xmlstarlet ed -L -u '/Config/ApiKey' -v "$SONARR_API_KEY" /out_sonarr/config.xml;
-      else
-        cat > /out_sonarr/config.xml <<EOF
+            fi &&
+            mkdir -p /out_sonarr &&
+            if [ -f /out_sonarr/config.xml ]; then
+              xmlstarlet ed -L -u '/Config/ApiKey' -v "$SONARR_API_KEY" /out_sonarr/config.xml;
+            else
+              cat > /out_sonarr/config.xml <<EOF
       <?xml version=\"1.0\" encoding=\"utf-8\"?>
       <Config>
         <ApiKey>$SONARR_API_KEY</ApiKey>
@@ -229,12 +239,12 @@ services:
         <AnalyticsEnabled>False</AnalyticsEnabled>
       </Config>
       EOF
-      fi &&
-      mkdir -p /out_radarr &&
-      if [ -f /out_radarr/config.xml ]; then
-        xmlstarlet ed -L -u '/Config/ApiKey' -v "$RADARR_API_KEY" /out_radarr/config.xml;
-      else
-        cat > /out_radarr/config.xml <<EOF
+            fi &&
+            mkdir -p /out_radarr &&
+            if [ -f /out_radarr/config.xml ]; then
+              xmlstarlet ed -L -u '/Config/ApiKey' -v "$RADARR_API_KEY" /out_radarr/config.xml;
+            else
+              cat > /out_radarr/config.xml <<EOF
       <?xml version=\"1.0\" encoding=\"utf-8\"?>
       <Config>
         <ApiKey>$RADARR_API_KEY</ApiKey>
@@ -248,10 +258,27 @@ services:
         <AnalyticsEnabled>False</AnalyticsEnabled>
       </Config>
       EOF
-      fi &&
-      chown -R 1000:1000 /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr &&
-      find /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr -type d -exec chmod 755 {} + &&
-      find /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr -type f -exec chmod 644 {} +
+            fi &&
+            mkdir -p /out_qbit/qBittorrent &&
+            cat > /out_qbit/qBittorrent/qBittorrent.conf <<EOF
+      [LegalNotice]
+      Accepted=true
+
+      [Preferences]
+      WebUI\\\\LocalHostAuth=false
+      WebUI\\\\AuthSubnetWhitelistEnabled=true
+      WebUI\\\\AuthSubnetWhitelist=172.16.0.0/12, 192.168.0.0/16, 10.0.0.0/8, 127.0.0.1/32
+      WebUI\\\\HostHeaderValidation=false
+      WebUI\\\\CSRFProtection=false
+      Downloads\\\\SavePath=/arr_downloads/
+      Downloads\\\\TempPath=/arr_downloads/temp/
+      Downloads\\\\TempPathEnabled=true
+      Session\\\\DefaultSavePath=/arr_downloads/
+      Session\\\\SavePath=/arr_downloads/
+      EOF
+            chown -R 1000:1000 /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr /out_qbit /out_jellyfin /out_jellyseerr /out_downloads /out_tv /out_movies /out_library &&
+            find /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr /out_qbit /out_jellyfin /out_jellyseerr /out_downloads /out_tv /out_movies /out_library -type d -exec chmod 755 {} + &&
+            find /out_homepage /out_homepage_logs /out_buildarr /out_prowlarr /out_sonarr /out_radarr /out_qbit /out_jellyfin /out_jellyseerr /out_downloads /out_tv /out_movies /out_library -type f -exec chmod 644 {} +
       "
     restart: "no"
 
@@ -266,7 +293,12 @@ services:
       - QBIT_PASS=${QBIT_PASS}
     volumes:
       - ./scripts:/scripts:ro
-    command: ["sh", "/scripts/init-download-clients.sh"]
+    command:
+      [
+        "sh",
+        "-c",
+        "apk add --no-cache jq curl && sh /scripts/init-download-clients.sh",
+      ]
     restart: "no"
     depends_on:
       sonarr:
